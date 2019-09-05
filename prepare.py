@@ -2,6 +2,7 @@ from utils import *
 
 def load_data():
     data = []
+    print(KEEP_IDX)
     if KEEP_IDX:
         cti = load_tkn_to_idx(sys.argv[1] + ".char_to_idx")
         wti = load_tkn_to_idx(sys.argv[1] + ".word_to_idx")

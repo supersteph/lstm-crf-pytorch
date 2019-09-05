@@ -6,11 +6,12 @@ def load_model():
     wti = load_tkn_to_idx(sys.argv[3]) # word_to_idx
     itt = load_idx_to_tkn(sys.argv[4]) # idx_to_tag
     model = rnn_crf(len(cti), len(wti), len(itt))
-    print(model)
+    #print(model)
     load_checkpoint(sys.argv[1], model)
     return model, cti, wti, itt
 
 def run_model(model, itt, batch):
+    # print(batch)
     batch_size = len(batch) # real batch size
     while len(batch) < BATCH_SIZE:
         batch.append([-1, "", [[]], [EOS_IDX], []])
@@ -18,8 +19,12 @@ def run_model(model, itt, batch):
     xc, xw = batchify(*zip(*[(x[2], x[3]) for x in batch]))
     batch = batch[:batch_size]
     result = model.decode(xc, xw)[:batch_size]
+    itt.append("0")
+    itt.append("1")
+    itt.append("0")
     for x, y in zip(batch, result):
         x.append([itt[j] for j in y])
+    # print(x[5])
     return [(x[1], x[4], x[5]) for x in sorted(batch)]
 
 def predict(filename, model, cti, wti, itt):
@@ -27,10 +32,11 @@ def predict(filename, model, cti, wti, itt):
     fo = open(filename)
     for idx, line in enumerate(fo):
         line = line.strip()
-        if re.match("(\S+/\S+( |$))+", line): # token/tag
-            x, y = zip(*[re.split("/(?=[^/]+$)", x) for x in line.split(" ")])
-        else: # no ground truth provided
-            x, y = tokenize(line, False), []
+        # print(line)
+        # if re.match("(\S+/\S+( |$))+", line): # token/tag
+        #     x, y = zip(*[re.split("/(?=[^/]+$)", x) for x in line.split(" ")])
+        # else: # no ground truth provided
+        x, y = tokenize(line, False), []
         ul = ["U" if normalize(w, False)[0].isupper() else "L" for w in x]
         x = list(map(normalize, x))
         if FORMAT == "word-segmentation":
@@ -54,11 +60,9 @@ if __name__ == "__main__":
         sys.exit("Usage: %s model char_to_idx word_to_idx tag_to_idx test_data" % sys.argv[0])
     print("cuda: %s" % CUDA)
     result = predict(sys.argv[5], *load_model())
-    for x, y0, y1 in result:
-        if not FORMAT:
-            print((x, y0, y1) if y0 else (x, y1))
-        else: # word/sentence segmentation
-            if y0:
-                print(iob_to_txt(x, y0))
-            print(iob_to_txt(x, y1))
-            print()
+    with open("write.txt", "w") as f:
+        for x, y0, y1 in result:
+            words = x.split(" ")
+            for i in range(len(words)):
+                f.write(str(words[i])+"/"+str(y1[i])+" ")
+            f.write("\n")

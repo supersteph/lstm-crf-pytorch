@@ -15,10 +15,15 @@ def load_data():
     print("loading %s" % sys.argv[5])
     fo = open(sys.argv[5], "r")
     for line in fo:
+        if line == "":
+            continue
         seq = line.strip().split(" ")
         x = [x.split(":") for x in seq[:len(seq) // 2]]
         y = [int(x) for x in seq[len(seq) // 2:]]
-        xc, xw = zip(*[(list(map(int, xc.split("+"))), int(xw)) for xc, xw in x])
+        try:
+            xc, xw = zip(*[(list(map(int, xc.split("+"))), int(xw)) for xc, xw in x])
+        except:
+            continue
         bxc.append(xc)
         bxw.append(xw)
         by.append(y)
@@ -42,6 +47,7 @@ def train():
     optim = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
     epoch = load_checkpoint(sys.argv[1], model) if isfile(sys.argv[1]) else 0
     filename = re.sub("\.epoch[0-9]+$", "", sys.argv[1])
+    print(filename)
     print("training model...")
     for ei in range(epoch + 1, epoch + num_epochs + 1):
         loss_sum = 0
@@ -59,11 +65,11 @@ def train():
             save_checkpoint("", None, ei, loss_sum, timer)
         else:
             save_checkpoint(filename, model, ei, loss_sum, timer)
-        if EVAL_EVERY and (ei % EVAL_EVERY == 0 or ei == epoch + num_epochs):
-            args = [model, cti, wti, itt]
-            evaluate(predict(sys.argv[6], *args), True)
-            model.train()
-            print()
+        # if EVAL_EVERY and (ei % EVAL_EVERY == 0 or ei == epoch + num_epochs):
+        #     args = [model, cti, wti, itt]
+        #     evaluate(predict(sys.argv[6], *args), True)
+        #     model.train()
+        #     print()
 
 if __name__ == "__main__":
     if len(sys.argv) not in [7, 8]:

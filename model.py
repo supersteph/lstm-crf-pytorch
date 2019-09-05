@@ -1,6 +1,5 @@
 from utils import *
 from embedding import embed
-
 class rnn_crf(nn.Module):
     def __init__(self, char_vocab_size, word_vocab_size, num_tags):
         super().__init__()
@@ -11,6 +10,7 @@ class rnn_crf(nn.Module):
     def forward(self, xc, xw, y): # for training
         mask = xw.data.gt(0).float()
         h = self.rnn(xc, xw, mask)
+        h = h.cuda()
         Z = self.crf.forward(h, mask)
         score = self.crf.score(h, y, mask)
         return Z - score # NLL loss
@@ -99,17 +99,23 @@ class crf(nn.Module):
     def decode(self, h, mask): # Viterbi decoding
         # initialize backpointers and viterbi variables in log space
         bptr = LongTensor()
-        score = Tensor(BATCH_SIZE, self.num_tags).fill_(-10000.)
-        score[:, SOS_IDX] = 0.
+        score = Tensor(BATCH_SIZE, self.num_tags+3).fill_(-10000.)
 
+        score[:, SOS_IDX] = 0.
+        trans = torch.load("trans.ptb").cuda()
         for t in range(h.size(1)): # recursion through the sequence
             mask_t = mask[:, t].unsqueeze(1)
-            score_t = score.unsqueeze(1) + self.trans # [B, 1, C] -> [B, C, C]
+            score_t = score.unsqueeze(1) + trans # [B, 1, C] -> [B, C, C]
             score_t, bptr_t = score_t.max(2) # best previous scores and tags
-            score_t += h[:, t] # plus emission scores
+            emission = h[:, t]
+            ends = torch.tensor([[emission[i][3],emission[i][6],emission[i][3]]for i in range(emission.size()[0])]).cuda()
+            score_t += torch.cat((emission,ends),dim=1) # plus emission scores
+            #score_t += emission
             bptr = torch.cat((bptr, bptr_t.unsqueeze(1)), 1)
             score = score_t * mask_t + score * (1 - mask_t)
-        score += self.trans[EOS_IDX]
+        score += trans[EOS_IDX]
+        for i in range(BATCH_SIZE):
+            score[i][3] = -10000
         best_score, best_tag = torch.max(score, 1)
 
         # back-tracking
@@ -121,7 +127,19 @@ class crf(nn.Module):
             for bptr_t in reversed(bptr[b][:y]):
                 x = bptr_t[x]
                 best_path[b].append(x)
+            if best_path[b][1]==11 and 4 in best_path[b]:
+                best_path[b] = [2]
+                x=13
+                for bptr_t in reversed(bptr[b][:y]):
+                    x = bptr_t[x]
+                    best_path[b].append(x)
+                #print("fuck up")
             best_path[b].pop()
             best_path[b].reverse()
-
+        #print(best_path)
         return best_path
+
+    # def maxwithlimits(bptr, score):
+    #     _,best_tag = torch.max(score, 1)
+    #     for b in range(BATCH_SIZE):
+    #         if best_path == 
