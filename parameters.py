@@ -1,15 +1,15 @@
+import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 UNIT = "word" # unit of tokenization (char, word)
 FORMAT = None # format (None, word-segmentation, sentence-segmentation)
-CASING = "uncased" # casing for normalization (cased, uncased, ul+uncased)
 RNN_TYPE = "LSTM" # LSTM or GRU
 NUM_DIRS = 2 # unidirectional: 1, bidirectional: 2
 NUM_LAYERS = 2
 BATCH_SIZE = 32
 EMBED = {"char-cnn": 50, "lookup": 250} # embeddings (char-cnn, char-rnn, lookup, sae)
-EMBED_SIZE = sum(EMBED.values())
 HIDDEN_SIZE = 1000
 DROPOUT = 0.5
 LEARNING_RATE = 1e-4

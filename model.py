@@ -8,15 +8,16 @@ class rnn_crf(nn.Module):
         self = self.cuda() if CUDA else self
 
     def forward(self, xc, xw, y): # for training
-        mask = xw.data.gt(0).float()
+        self.zero_grad()
+        mask = xw.gt(0).float()
         h = self.rnn(xc, xw, mask)
         h = h.cuda()
         Z = self.crf.forward(h, mask)
         score = self.crf.score(h, y, mask)
-        return Z - score # NLL loss
+        return torch.mean(Z - score) # NLL loss
 
-    def decode(self, xc, xw): # for prediction
-        mask = xw.data.gt(0).float()
+    def decode(self, xc, xw): # for inference 
+        mask = xw.gt(0).float()
         h = self.rnn(xc, xw, mask)
         return self.crf.decode(h, mask)
 
@@ -27,23 +28,23 @@ class rnn(nn.Module):
         # architecture
         self.embed = embed(char_vocab_size, word_vocab_size)
         self.rnn = getattr(nn, RNN_TYPE)(
-            input_size = EMBED_SIZE,
+            input_size = sum(EMBED.values()),
             hidden_size = HIDDEN_SIZE // NUM_DIRS,
             num_layers = NUM_LAYERS,
             bias = True,
             batch_first = True,
             dropout = DROPOUT,
-            bidirectional = NUM_DIRS == 2
+            bidirectional = (NUM_DIRS == 2)
         )
         self.out = nn.Linear(HIDDEN_SIZE, num_tags) # RNN output to tag
 
-    def init_state(self): # initialize the cell state
-        args = [NUM_LAYERS * NUM_DIRS, BATCH_SIZE, HIDDEN_SIZE // NUM_DIRS]
+    def init_state(self): # initialize RNN states
+        args = (NUM_LAYERS * NUM_DIRS, BATCH_SIZE, HIDDEN_SIZE // NUM_DIRS)
         hs = zeros(*args) # hidden state
-        if RNN_TYPE == "GRU":
-            return hs
-        cs = zeros(*args) # cell state
-        return (hs, cs)
+        if RNN_TYPE == "LSTM":
+            cs = zeros(*args) # LSTM cell state
+            return (hs, cs)
+        return hs
 
     def forward(self, xc, xw, mask):
         s = self.init_state()
@@ -62,16 +63,16 @@ class crf(nn.Module):
 
         # matrix of transition scores from j to i
         self.trans = nn.Parameter(randn(num_tags, num_tags))
-        self.trans.data[SOS_IDX, :] = -10000. # no transition to SOS
-        self.trans.data[:, EOS_IDX] = -10000. # no transition from EOS except to PAD
-        self.trans.data[:, PAD_IDX] = -10000. # no transition from PAD except to PAD
-        self.trans.data[PAD_IDX, :] = -10000. # no transition to PAD except from EOS
-        self.trans.data[PAD_IDX, EOS_IDX] = 0.
-        self.trans.data[PAD_IDX, PAD_IDX] = 0.
+        self.trans.data[SOS_IDX, :] = -10000 # no transition to SOS
+        self.trans.data[:, EOS_IDX] = -10000 # no transition from EOS except to PAD
+        self.trans.data[:, PAD_IDX] = -10000 # no transition from PAD except to PAD
+        self.trans.data[PAD_IDX, :] = -10000 # no transition to PAD except from EOS
+        self.trans.data[PAD_IDX, EOS_IDX] = 0
+        self.trans.data[PAD_IDX, PAD_IDX] = 0
 
     def forward(self, h, mask): # forward algorithm
         # initialize forward variables in log space
-        score = Tensor(BATCH_SIZE, self.num_tags).fill_(-10000.) # [B, C]
+        score = Tensor(BATCH_SIZE, self.num_tags).fill_(-10000) # [B, C]
         score[:, SOS_IDX] = 0.
         trans = self.trans.unsqueeze(0) # [1, C, C]
         for t in range(h.size(1)): # recursion through the sequence
@@ -99,7 +100,12 @@ class crf(nn.Module):
     def decode(self, h, mask): # Viterbi decoding
         # initialize backpointers and viterbi variables in log space
         bptr = LongTensor()
+<<<<<<< HEAD
         score = Tensor(BATCH_SIZE, self.num_tags+3).fill_(-10000.)
+=======
+        score = Tensor(BATCH_SIZE, self.num_tags).fill_(-10000)
+        score[:, SOS_IDX] = 0.
+>>>>>>> 2b9b8dc49c6566ca377677c752f12a1365181aea
 
         score[:, SOS_IDX] = 0.
         trans = torch.load("trans.ptb").cuda()

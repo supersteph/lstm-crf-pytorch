@@ -16,12 +16,16 @@ def run_model(model, itt, batch):
     while len(batch) < BATCH_SIZE:
         batch.append([-1, "", [[]], [EOS_IDX], []])
     batch.sort(key = lambda x: -len(x[3]))
-    xc, xw = batchify(*zip(*[(x[2], x[3]) for x in batch]))
+    bxc, bxw = batchify(*zip(*[(x[2], x[3]) for x in batch]))
     batch = batch[:batch_size]
+<<<<<<< HEAD
     result = model.decode(xc, xw)[:batch_size]
     itt.append("0")
     itt.append("1")
     itt.append("0")
+=======
+    result = model.decode(bxc, bxw)[:batch_size]
+>>>>>>> 2b9b8dc49c6566ca377677c752f12a1365181aea
     for x, y in zip(batch, result):
         x.append([itt[j] for j in y])
     # print(x[5])
@@ -32,6 +36,7 @@ def predict(filename, model, cti, wti, itt):
     fo = open(filename)
     for idx, line in enumerate(fo):
         line = line.strip()
+<<<<<<< HEAD
         # print(line)
         # if re.match("(\S+/\S+( |$))+", line): # token/tag
         #     x, y = zip(*[re.split("/(?=[^/]+$)", x) for x in line.split(" ")])
@@ -39,13 +44,19 @@ def predict(filename, model, cti, wti, itt):
         x, y = tokenize(line, False), []
         ul = ["U" if normalize(w, False)[0].isupper() else "L" for w in x]
         x = list(map(normalize, x))
+=======
+        if re.match("(\S+/\S+( |$))+", line): # token/tag
+            x, y = zip(*[re.split("/(?=[^/]+$)", x) for x in line.split(" ")])
+            line = " ".join(x)
+        else: # no ground truth provided
+            y = []
+        x = tokenize(line)
+>>>>>>> 2b9b8dc49c6566ca377677c752f12a1365181aea
         if FORMAT == "word-segmentation":
             y = [c for w in [["B"] + ["I"] * (len(w) - 1) for w in x] for c in w]
             wti = cti
         xc = [[cti[c] if c in cti else UNK_IDX for c in w] for w in x]
         xw = [wti[w] if w in wti else UNK_IDX for w in map(lambda x: x.lower(), x)]
-        if CASING[:2] == "ul": # prepend the caseness of the first letter
-            xc = [[cti[v]] + w for v, w in zip(ul, xc)]
         data.append([idx, line, xc, xw, y])
     fo.close()
     with torch.no_grad():

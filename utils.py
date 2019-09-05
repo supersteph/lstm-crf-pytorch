@@ -2,13 +2,13 @@ import sys
 import re
 from parameters import *
 
-def normalize(x, lc = True):
+def normalize(x):
     # x = re.sub("[\uAC00-\uD7A3]+", "\uAC00", x) £ convert Hangeul to 가
     # x = re.sub("[\u3040-\u30FF]+", "\u3042", x) # convert Hiragana and Katakana to あ
     # x = re.sub("[\u4E00-\u9FFF]+", "\u6F22", x) # convert CJK unified ideographs to 漢
     x = re.sub("\s+", " ", x)
     x = re.sub("^ | $", "", x)
-    x = x.lower() if lc and CASING[-7:] == "uncased" else x
+    x = x.lower()
     return x
 
 def tokenize(x, norm = True):
@@ -58,7 +58,7 @@ def load_checkpoint(filename, model = None):
         model.load_state_dict(checkpoint["state_dict"])
     epoch = checkpoint["epoch"]
     loss = checkpoint["loss"]
-    print("saved model: epoch = %d, loss = %f" % (checkpoint["epoch"], checkpoint["loss"]))
+    print("saved model: epoch = %d, loss = %f\n" % (checkpoint["epoch"], checkpoint["loss"]))
     return epoch
 
 def save_checkpoint(filename, model, epoch, loss, time):
@@ -80,18 +80,18 @@ LongTensor = cudify(torch.LongTensor)
 randn = cudify(torch.randn)
 zeros = cudify(torch.zeros)
 
-def batchify(xc, xw, sos = False, eos = False, minlen = 0):
-    xw_len = max(minlen, max(len(x) for x in xw))
-    if xc:
-        xc_len = max(minlen, max(len(w) for x in xc for w in x))
-        pad = [[PAD_IDX] * (xc_len + 2)]
-        xc = [[[SOS_IDX] + w + [EOS_IDX] + [PAD_IDX] * (xc_len - len(w)) for w in x] for x in xc]
-        xc = [(pad if sos else []) + x + (pad * (xw_len - len(x) + eos)) for x in xc]
-        xc = LongTensor(xc)
+def batchify(bxc, bxw, sos = False, eos = False, minlen = 0):
+    bxw_len = max(minlen, max(len(x) for x in bxw))
+    if bxc:
+        bxc_len = max(minlen, max(len(w) for x in bxc for w in x))
+        pad = [[PAD_IDX] * (bxc_len + 2)]
+        bxc = [[[SOS_IDX, *w, EOS_IDX, *[PAD_IDX] * (bxc_len - len(w))] for w in x] for x in bxc]
+        bxc = [(pad if sos else []) + x + (pad * (bxw_len - len(x) + eos)) for x in bxc]
+        bxc = LongTensor(bxc)
     sos = [SOS_IDX] if sos else []
     eos = [EOS_IDX] if eos else []
-    xw = [sos + list(x) + eos + [PAD_IDX] * (xw_len - len(x)) for x in xw]
-    return xc, LongTensor(xw)
+    bxw = [sos + list(x) + eos + [PAD_IDX] * (bxw_len - len(x)) for x in bxw]
+    return bxc, LongTensor(bxw)
 
 def log_sum_exp(x):
     m = torch.max(x, -1)[0]
